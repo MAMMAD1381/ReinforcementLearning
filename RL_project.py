@@ -336,7 +336,8 @@ def do_policy(env, policy, episdoes=5):
 
 def policy_iteration(env, custom_map, max_ittr=30, theta=0.01, discount_factor=0.9):
       # it gives a random-walk policy
-    V = np.zeros(env.observation_space.n)  # you can change it with any init value
+    V = np.zeros(env.observation_space.n)
+    # you can change it with any init value
     P = env.P  # This attribute stores the transition probabilities
     valueFunctionVectorInitial = np.zeros(env.observation_space.n)
     # maximum number of iterations of the iterative policy evaluation algorithm
@@ -363,35 +364,31 @@ def policy_iteration(env, custom_map, max_ittr=30, theta=0.01, discount_factor=0
                                                       discount_factor)
         # if two policies are equal up to a certain "small" tolerance
         # then break the loop - our algorithm converged
-        print("kiiiir1\n",currentPolicy)
-        print("kiiiir2\n",improvedPolicy)
-        if np.allclose(currentPolicy, improvedPolicy):
+
+        if currentPolicy==improvedPolicy:
             currentPolicy = improvedPolicy
 
             print("Policy iteration algorithm converged!")
             break
         currentPolicy = improvedPolicy
-
-
-        # policy improvement
-
-
         ittr += 1
+        # print(ittr)
 
-    return V, currentPolicy
+    print("finish")
+    return valueFunctionVectorComputed, currentPolicy
 
 
 def improvePolicy(env, valueFunctionVector, numberActions, numberStates, discountRate):
     import numpy as np
     # this matrix will store the q-values (action value functions) for every state
     # this matrix is returned by the function
-    qvaluesMatrix = np.zeros((numberStates, numberActions))
+    qvaluesMatrix = np.zeros((env.observation_space.n, numberActions))
     # this is the improved policy
     # this matrix is returned by the function
     improvedPolicy = {}
 
-    for stateIndex in range(numberStates):
-        action_dict= {}
+    for stateIndex in range(env.observation_space.n):
+        action_dict= {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0}
         # computes a row of the qvaluesMatrix[stateIndex,:] for fixed stateIndex,
         # this loop iterates over the actions
 
@@ -405,9 +402,8 @@ def improvePolicy(env, valueFunctionVector, numberActions, numberStates, discoun
         bestActionIndex = np.where(qvaluesMatrix[stateIndex, :] == np.max(qvaluesMatrix[stateIndex, :]))
 
         # form the improved policy
-        print("test",bestActionIndex[0]
-              )
-        action_dict[bestActionIndex]=2
+
+        action_dict[bestActionIndex[0][0]]=2
         improvedPolicy[stateIndex] =  action_dict
 
     return improvedPolicy, qvaluesMatrix
@@ -428,7 +424,8 @@ def evaluatePolicy(env,valueFunctionVector,policy,discountRate,maxNumberOfIterat
                     # print(probability, nextState, reward, isTerminalState)
                     innerSum=innerSum+ probability*(reward+discountRate*valueFunctionVector[nextState])
 
-
+                # print("de",state,action)
+                # print(policy[state][action])
                 outerSum=outerSum+policy[state][action]*innerSum
 
 
@@ -439,7 +436,7 @@ def evaluatePolicy(env,valueFunctionVector,policy,discountRate,maxNumberOfIterat
             print('Iterative policy evaluation algorithm converged!')
             break
         valueFunctionVector=valueFunctionVectorNextIteration
-    print(valueFunctionVector)
+
     return valueFunctionVector
 
 
@@ -664,7 +661,7 @@ custom_map_8 = ["HFFSFFH",
                 "GFFHFFG"]
 #############################
 if __name__ == "__main__":
-    map = custom_map_3
+    map = custom_map_1
     env = gym.make("FrozenLake-v1", render_mode="ansi", desc=map, is_slippery=True)
     # env = gym.make("FrozenLake-v1", desc=map, is_slippery=True)
     env = ModifyRewards(
@@ -673,9 +670,10 @@ if __name__ == "__main__":
     env.reset()
     print(env.render())
     ###
-    policy = policy_iteration(env, map, 30)
+    v ,policy = policy_iteration(env, map, 30)
     # policy = get_init_policy(map)
     # plot_policy_arrows(policy, map)
+    print(policy)
     do_policy(env, policy)
 
     rewards = 0
