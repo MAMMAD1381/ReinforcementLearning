@@ -337,46 +337,55 @@ def do_policy(env, policy, episdoes=5):
 def policy_iteration(env, custom_map, max_ittr=30, theta=0.01, discount_factor=0.9):
       # it gives a random-walk policy
     V = np.zeros(env.observation_space.n)
-    # you can change it with any init value
-    P = env.P  # This attribute stores the transition probabilities
-    # maximum number of iterations of the iterative policy evaluation algorithm
-    maxNumberOfIterationsOfIterativePolicyEvaluation = 1000
-    # convergence tolerance
-    convergenceToleranceIterativePolicyEvaluation = 10 ** (-6)
+    for i in range(len(custom_map)):
+        for j in range(len(custom_map[i])):
+            if custom_map[i][j] == "G":
+                V[i*len(custom_map) +j]=100
 
-    # number of possible actions in every state - determined by the Frozen Lake environment
-    actionNumber = 4
-    currentPolicy= get_init_policy(custom_map)
-
-    # and rewards for each possible action in each possible
-    # state of the environment.
-
-    # loop till policy_stable becomes True or itter >= max_ittr
+    nS=env.observation_space.n
+    policy=get_init_policy(custom_map)
     ittr = 0
     policy_stable = False
     while not policy_stable and ittr < max_ittr:
         # policy evaluation
-        print("pol",currentPolicy[5])
-        V = evaluatePolicy(env, V, currentPolicy, discount_factor,
-                           maxNumberOfIterationsOfIterativePolicyEvaluation,
-                           convergenceToleranceIterativePolicyEvaluation)
+        policy_evaluation(V ,policy,nS)
+        policy = improvePolicy(env, V, discount_factor)
 
-        improvedPolicy, qvaluesMatrix = improvePolicy(env, V,discount_factor)
-        # if two policies are equal up to a certain "small" tolerance
-        # then break the loop - our algorithm converged
 
-        if currentPolicy==improvedPolicy:
-            currentPolicy = improvedPolicy
 
-            print("Policy iteration algorithm converged!")
-            break
-        currentPolicy = improvedPolicy
+
+        # policy_evaluation(env,V, policy)
+        # policy_stable = policy_improvement(env,V, policy)
         ittr += 1
-        # print(ittr)
 
     print("finish")
-    return V, currentPolicy
 
+    return V, policy
+
+def eval_state_action(V, s, a, gamma=0.90):
+    return np.sum([p * (rew + gamma*V[next_s]) for p, next_s, rew, _ in env.P[s][a]])
+
+def policy_evaluation(V, policy,states, eps=0.0001):
+    '''
+    Policy evaluation. Update the value function until it reach a steady state
+    '''
+
+    while True:
+        delta = 0
+        # loop over all states
+        for state in range(states):
+            old_v = V[state]
+            # update V[s] using the Bellman equation
+
+            sum=0
+            for action in range(4):
+                sum+=eval_state_action(V, state, action)*policy[state][action]
+            V[state] = sum
+            delta = max(delta, np.abs(old_v - V[state]))
+
+        if delta < eps:
+            break
+    print(V)
 
 def improvePolicy(env, valueFunctionVector, discountRate):
     import numpy as np
@@ -398,50 +407,20 @@ def improvePolicy(env, valueFunctionVector, discountRate):
                 qvaluesMatrix[stateIndex][ actionIndex] = qvaluesMatrix[stateIndex][ actionIndex] + probability * (
                             reward + discountRate * valueFunctionVector[nextState])
 
-        # find the action indices that produce the highest values of action value functions
+
+                    # find the action indices that produce the highest values of action value functions
 
         bestActionIndex = np.where(qvaluesMatrix[stateIndex, :] == np.max(qvaluesMatrix[stateIndex, :]))
 
         # form the improved policy
-        if np.max(qvaluesMatrix[stateIndex])!=0:
-            for i in range(np.size(bestActionIndex)):
-                action_dict[bestActionIndex[0][i]] = 1 / np.size(bestActionIndex)
+        # print("ki",stateIndex ,bestActionIndex[0][0])
+        for i in range(np.size(bestActionIndex)):
+            action_dict[bestActionIndex[0][i]] = 1 / np.size(bestActionIndex)
 
 
         improvedPolicy[stateIndex] =action_dict
     # print("improved",improvedPolicy)
-    return improvedPolicy, qvaluesMatrix
-
-
-def evaluatePolicy(env,valueFunctionVector,policy,discountRate,maxNumberOfIterations,convergenceTolerance):
-    import numpy as np
-    convergenceTrack=[]
-    for iterations in range(maxNumberOfIterations):
-        convergenceTrack.append(np.linalg.norm(valueFunctionVector,2))
-        valueFunctionVectorNextIteration=np.zeros(env.observation_space.n)
-        # print(env.P)
-        for state in env.P:
-            outerSum=0
-            for action in env.P[state]:
-                innerSum=0
-                for probability, nextState, reward, isTerminalState in env.P[state][action]:
-                    # print(probability, nextState, reward, isTerminalState)
-                    innerSum=innerSum+ probability*(reward+discountRate*valueFunctionVector[nextState])
-
-                # print("de",state,action)
-                # print(policy[state][action])
-                outerSum=outerSum+policy[state][action]*innerSum
-
-
-            valueFunctionVectorNextIteration[state]=outerSum
-
-        if(np.max(np.abs(valueFunctionVectorNextIteration-valueFunctionVector))<convergenceTolerance):
-            valueFunctionVector=valueFunctionVectorNextIteration
-            # print('Iterative policy evaluation algorithm converged!')
-            break
-        valueFunctionVector=valueFunctionVectorNextIteration
-
-    return valueFunctionVector
+    return improvedPolicy
 
 
 
@@ -675,8 +654,12 @@ if __name__ == "__main__":
     print(env.render())
     ###
     v ,policy = policy_iteration(env, map, 50)
+    print(v.reshape((len(map), len(map[0]))))
+    print(policy)
+
     # policy = get_init_policy(map)
     # plot_policy_arrows(policy, map)
+
 
     do_policy(env, policy,50)
 
