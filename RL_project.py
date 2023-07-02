@@ -70,6 +70,7 @@ class ModifyRewards(gym.Wrapper):
 
     def step(self, action):
         next_state, reward, done, truncated, info = self.env.step(action)
+
         modified_reward = modify_rewards(
             next_state,
             self.custom_map,
@@ -305,42 +306,15 @@ def do_policy(env, policy, episdoes=5):
     print(env.render())
 
 
-############################### algorithm methods : you have to implement these algorithms
-
-
-# Implement policy iteration using the Policy Evaluation and Policy Improvement steps. In the Policy Evaluation step, you compute
-# the state values for each state in the environment using the Bellman equation and the current policy. In the Policy Improvement
-# step, you improve the policy by choosing the action that maximizes the value function for each state.
-# def policy_iteration(env, custom_map, max_ittr=30, theta=0.01, discount_factor=0.9):
-#     policy = get_init_policy(custom_map)  # it gives a random-walk policy
-#     V = np.zeros(env.observation_space.n)  # you can change it with any init value
-#     P = env.P  # This attribute stores the transition probabilities
-#     # and rewards for each possible action in each possible
-#     # state of the environment.
-#
-#
-#     # loop till policy_stable becomes True or itter >= max_ittr
-#     ittr = 0
-#     policy_stable = False
-#     while not policy_stable and ittr < max_ittr:
-#         V = policy_evaluation(env, policy)
-#         # policy evaluation
-#
-#         policy = policy_improvement(env, V)
-#         # policy improvement
-#
-#         ittr += 1
-#     return V, policy
-
 
 
 def policy_iteration(env, custom_map, max_ittr=30, theta=0.01, discount_factor=0.9):
       # it gives a random-walk policy
     V = np.zeros(env.observation_space.n)
-    for i in range(len(custom_map)):
-        for j in range(len(custom_map[i])):
-            if custom_map[i][j] == "G":
-                V[i*len(custom_map) +j]=100
+    # for i in range(len(custom_map)):
+    #     for j in range(len(custom_map[i])):
+    #         if custom_map[i][j] == "G":
+    #             V[i*len(custom_map) +j]=100
 
     nS=env.observation_space.n
     policy=get_init_policy(custom_map)
@@ -348,16 +322,11 @@ def policy_iteration(env, custom_map, max_ittr=30, theta=0.01, discount_factor=0
     policy_stable = False
     while not policy_stable and ittr < max_ittr:
         # policy evaluation
-        policy_evaluation(V ,policy,nS)
+        policy_evaluation(V ,policy,nS ,theta)
         policy = improvePolicy(env, V, discount_factor)
 
 
-
-
-        # policy_evaluation(env,V, policy)
-        # policy_stable = policy_improvement(env,V, policy)
         ittr += 1
-
     print("finish")
 
     return V, policy
@@ -365,7 +334,7 @@ def policy_iteration(env, custom_map, max_ittr=30, theta=0.01, discount_factor=0
 def eval_state_action(V, s, a, gamma=0.90):
     return np.sum([p * (rew + gamma*V[next_s]) for p, next_s, rew, _ in env.P[s][a]])
 
-def policy_evaluation(V, policy,states, eps=0.0001):
+def policy_evaluation(V, policy,states, eps=0.01):
     '''
     Policy evaluation. Update the value function until it reach a steady state
     '''
@@ -376,7 +345,6 @@ def policy_evaluation(V, policy,states, eps=0.0001):
         for state in range(states):
             old_v = V[state]
             # update V[s] using the Bellman equation
-
             sum=0
             for action in range(4):
                 sum+=eval_state_action(V, state, action)*policy[state][action]
@@ -407,9 +375,6 @@ def improvePolicy(env, valueFunctionVector, discountRate):
                 qvaluesMatrix[stateIndex][ actionIndex] = qvaluesMatrix[stateIndex][ actionIndex] + probability * (
                             reward + discountRate * valueFunctionVector[nextState])
 
-
-                    # find the action indices that produce the highest values of action value functions
-
         bestActionIndex = np.where(qvaluesMatrix[stateIndex, :] == np.max(qvaluesMatrix[stateIndex, :]))
 
         # form the improved policy
@@ -423,128 +388,34 @@ def improvePolicy(env, valueFunctionVector, discountRate):
     return improvedPolicy
 
 
-
-
-# def policy_evaluation(env, policy, V, theta=0.01, gamma=0.9):
-#     while True:
-#         delta = 0
-#         for state in range(env.observation_space.n):
-#             value = 0
-#             for action, action_prob in enumerate(policy[state]):
-#                 for prob, next_state, reward, done in env.P[state][action]:
-#                     value += action_prob * prob * (reward + gamma * V[next_state])
-#             delta = max(delta, np.abs(value - V[state]))
-#             V[state] = value
-#         if delta < theta:
-#             break
-#     return np.array(V)
-
-# def policy_evaluation(env, policy, V, theta=0.0001, gamma=0.9):
-#     while True:
-#         delta = 0
-#         for state in range(env.observation_space.n):
-#             v = V[state]
-#             V[state] = 0
-#             for action in range(env.action_space.n):
-#                 action_prob = policy[state][action]
-#                 for prob, next_state, reward, done in env.P[state][action]:
-#                     V[state] += action_prob * prob * (reward + gamma * V[next_state])
-#             delta = max(delta, abs(v - V[state]))
-#         if delta < theta:
-#             break
-#     for state in range(env.observation_space.n):
-#         q_sa = np.zeros(env.action_space.n)
-#         for action in range(env.action_space.n):
-#             for prob, next_state, reward, done in env.P[state][action]:
-#                 q_sa[action] += prob * (reward + gamma * V[next_state])
-#         policy_dict = {i: {j: 0 for j in range(env.action_space.n)} for i in range(env.observation_space.n)}
-#         policy_dict[state][np.argmax(q_sa)] = 1
-#         policy[state] = np.array(list(policy_dict[state].values()))
-#     return V
-
-
-
-
-
-
-# def policy_improvement(env, V, gamma=0.9):
-#     policy = np.zeros(env.observation_space.n)
-#     for state in range(env.observation_space.n):
-#         q_sa = np.zeros(env.observation_space.n)
-#         for a in range(env.observation_space.n):
-#
-#             for prob, next_state, reward, done in env.P[state][a]:
-#                 q_sa[a] += prob * (reward + gamma * V[next_state])
-#         policy[state] = np.argmax(q_sa)
-#     return policy
-
-# def policy_improvement(env, V, gamma=0.9):
-#     policy = np.zeros(env.observation_space.n)
-#     for state in range(env.observation_space.n):
-#         q_sa = np.zeros(env.action_space.n)
-#         for action in range(env.action_space.n):
-#             for prob, next_state, reward, done in env.P[state][action]:
-#                 q_sa[action] += prob * (reward + gamma * np.array(V)[next_state])
-#         policy[state] = np.argmax(q_sa)
-#     return policy
-
-
-
-
-
 # This algorithm allows you to estimate the state values of a given policy by sampling episodes and
 # calculating the average returns(in first visit of a state in each episode)
 def first_visit_mc_prediction(env, policy, num_episodes, gamma):
     # initilize
-    V = np.zeros(env.observation_space.n)
-    N = np.zeros(env.observation_space.n)
-
-    # loop in range num_episodes(for each episode)
-    # for i_episode in range(num_episodes):
-
-    # generate episode w.r.t policy
-
-    # loop for each step of episode , t= T-1, T-2, ..., 0
-
-
-
-    # Initialize empty dictionaries to store returns and state counts
     returns_sum = {}
     returns_count = {}
-
-    # Initialize state-value function V as a dictionary of zeros
-    V = {state: 0 for state in range(env.observation_space.n)}
-
-    # Loop over episodes
-    for episode in range(num_episodes):
-        # Generate an episode using the given policy
-        states_visited = []
-        rewards_received = []
+    V = {}
+    for s in range(env.observation_space.n):
+        returns_sum[s] = 0
+        returns_count[s] = 0
+        V[s] = 0.0
+    for i_episode in range(1, num_episodes + 1):
+        episode = []
         state = env.reset()
-        done = False
-        while not done:
-            action = policy[state]
+        for t in range(100):
+            action = np.random.choice(np.arange(len(policy[state])), p=policy[state])
             next_state, reward, done, _ = env.step(action)
-            states_visited.append(state)
-            rewards_received.append(reward)
+            episode.append((state, action, reward))
+            if done:
+                break
             state = next_state
-
-        # Compute returns for each visited state in the episode
-        G = 0
-        for t in range(len(states_visited) - 1, -1, -1):
-            G = gamma * G + rewards_received[t]
-            if states_visited[t] not in states_visited[:t]:
-                if states_visited[t] in returns_sum:
-                    returns_sum[states_visited[t]] += G
-                    returns_count[states_visited[t]] += 1
-                else:
-                    returns_sum[states_visited[t]] = G
-                    returns_count[states_visited[t]] = 1
-
-        # Update state-value function V based on the computed returns
-        for state in returns_sum:
+        states_in_episode = set([tuple(x[0]) for x in episode])
+        for state in states_in_episode:
+            first_occurence_idx = next(i for i, x in enumerate(episode) if x[0] == state)
+            G = sum([x[2] * (gamma ** i) for i, x in enumerate(episode[first_occurence_idx:])])
+            returns_sum[state] += G
+            returns_count[state] += 1
             V[state] = returns_sum[state] / returns_count[state]
-
     return V
 
 
@@ -578,10 +449,16 @@ def every_visit_mc_prediction(env, policy, num_episodes, gamma):
         states_visited = []
         rewards_received = []
         state = env.reset()
+        print(state[0])
         done = False
         while not done:
-            action = policy[state]
-            next_state, reward, done, _ = env.step(action)
+            for i in range(4):
+                print("i:",i ,policy[state[0]][i])
+                if policy[state[0]][i]==1:
+                    action=i
+                    break
+
+            next_state, reward, done ,truncated, info = env.step(action)
             states_visited.append(state)
             rewards_received.append(reward)
             state = next_state
@@ -644,18 +521,19 @@ custom_map_8 = ["HFFSFFH",
                 "GFFHFFG"]
 #############################
 if __name__ == "__main__":
-    map = custom_map_3
-    env = gym.make("FrozenLake-v1", render_mode="ansi", desc=map, is_slippery=True)
+    map = custom_map_4
+    env = gym.make("FrozenLake-v1", render_mode="human", desc=map, is_slippery=True)
     # env = gym.make("FrozenLake-v1", desc=map, is_slippery=True)
     env = ModifyRewards(
-        env, custom_map=map, hole_reward=0, goal_reward=1, move_reward=-0.2
+        env, custom_map=map, hole_reward=-0.1, goal_reward=1, move_reward=-0.1
     )
     env.reset()
-    print(env.render())
+    env.render()
     ###
     v ,policy = policy_iteration(env, map, 50)
     print(v.reshape((len(map), len(map[0]))))
     print(policy)
+
 
     # policy = get_init_policy(map)
     # plot_policy_arrows(policy, map)
