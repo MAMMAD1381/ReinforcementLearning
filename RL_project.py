@@ -332,6 +332,11 @@ def policy_iteration(env, custom_map, max_ittr=30, theta=0.01, discount_factor=0
     return V, policy
 
 def eval_state_action(V, s, a, gamma=0.90):
+    sum=0
+    for p, next_s, rew, _ in env.P[s][a]:
+        sum+=p * (rew + gamma*V[next_s])
+        # print("suuuuuum",s,a,env.P[s][a])
+
     return np.sum([p * (rew + gamma*V[next_s]) for p, next_s, rew, _ in env.P[s][a]])
 
 def policy_evaluation(V, policy,states, eps=0.01):
@@ -347,7 +352,10 @@ def policy_evaluation(V, policy,states, eps=0.01):
             # update V[s] using the Bellman equation
             sum=0
             for action in range(4):
-                sum+=eval_state_action(V, state, action)*policy[state][action]
+                print("pol:",policy[state][action])
+                # test=eval_state_action(V, state, action)*policy[state][action]
+                test=eval_state_action(V, state, action)*policy[state][action]
+                sum+=test
             V[state] = sum
             delta = max(delta, np.abs(old_v - V[state]))
 
@@ -388,35 +396,55 @@ def improvePolicy(env, valueFunctionVector, discountRate):
     return improvedPolicy
 
 
-# This algorithm allows you to estimate the state values of a given policy by sampling episodes and
-# calculating the average returns(in first visit of a state in each episode)
-def first_visit_mc_prediction(env, policy, num_episodes, gamma):
-    # initilize
-    returns_sum = {}
-    returns_count = {}
-    V = {}
-    for s in range(env.observation_space.n):
-        returns_sum[s] = 0
-        returns_count[s] = 0
-        V[s] = 0.0
-    for i_episode in range(1, num_episodes + 1):
-        episode = []
-        state = env.reset()
-        for t in range(100):
-            action = np.random.choice(np.arange(len(policy[state])), p=policy[state])
-            next_state, reward, done, _ = env.step(action)
-            episode.append((state, action, reward))
-            if done:
+def first_visit_mc_prediction(env, policy, num_episodes, gamma=1):
+    # sum of returns for every state
+    stateNumber = env.observation_space.n
+    return_sum = np.zeros(stateNumber)
+    state_count = np.zeros(stateNumber)
+    v = np.zeros(stateNumber)
+
+    for indexEpisode in range(num_episodes):
+        # this list stores visited states in the current episode
+        visitedStatesInEpisode = []
+        # this list stores the return in every visited state in the current episode
+        rewardInVisitedState = []
+        (currentState, prob) = env.reset()
+        visitedStatesInEpisode.append(currentState)
+        print("Simulating episode {}".format(indexEpisode))
+        ###########################################################################
+        # START episode simulation
+        ###########################################################################
+        while True:
+            action = get_action_wrt_policy(currentState, policy) #action in current state accoeding to policy
+            (currentState, currentReward, terminalState, _, _) = env.step(action)
+            rewardInVisitedState.append(currentReward)
+            # if the current state is NOT terminal state
+            if not terminalState:
+                visitedStatesInEpisode.append(currentState)
+            else:
                 break
-            state = next_state
-        states_in_episode = set([tuple(x[0]) for x in episode])
-        for state in states_in_episode:
-            first_occurence_idx = next(i for i, x in enumerate(episode) if x[0] == state)
-            G = sum([x[2] * (gamma ** i) for i, x in enumerate(episode[first_occurence_idx:])])
-            returns_sum[state] += G
-            returns_count[state] += 1
-            V[state] = returns_sum[state] / returns_count[state]
-    return V
+        # how many states we visited in an episode
+        numberOfVisitedStates = len(visitedStatesInEpisode)
+
+        # this is G=R_{t+1}+\gamma R_{t+2} + \gamma^2 R_{t+3} + ...
+        G = 0
+        for indexCurrentState in range(numberOfVisitedStates - 1, -1, -1):
+            # summing the returns backwards
+            stateTmp = visitedStatesInEpisode[indexCurrentState]
+            returnTmp = rewardInVisitedState[indexCurrentState]
+            G = gamma * G + returnTmp
+
+            if stateTmp not in visitedStatesInEpisode[0:indexCurrentState]:
+                #this state is visited in the episode
+                state_count[stateTmp] = state_count[stateTmp] + 1
+                # add the sum for that state to the total sum for that state
+                return_sum[stateTmp] = return_sum[stateTmp] + G
+
+    for indexSum in range(stateNumber):
+        if state_count[indexSum] != 0:
+            v[indexSum] = return_sum[indexSum] / state_count[indexSum]
+
+    return v
 
 
 # This algorithm allows you to estimate the state values of a given policy by sampling episodes and
@@ -521,17 +549,18 @@ custom_map_8 = ["HFFSFFH",
                 "GFFHFFG"]
 #############################
 if __name__ == "__main__":
-    map = custom_map_4
-    env = gym.make("FrozenLake-v1", render_mode="human", desc=map, is_slippery=True)
+    map = custom_map_7
+    env = gym.make("FrozenLake-v1", render_mode="ansi", desc=map, is_slippery=False)
     # env = gym.make("FrozenLake-v1", desc=map, is_slippery=True)
     env = ModifyRewards(
-        env, custom_map=map, hole_reward=-0.1, goal_reward=1, move_reward=-0.1
+        env, custom_map=map, hole_reward=-0.2, goal_reward=1, move_reward=-0.1
     )
     env.reset()
-    env.render()
+    print(env.render())
     ###
     v ,policy = policy_iteration(env, map, 50)
-    print(v.reshape((len(map), len(map[0]))))
+    v=first_visit_mc_prediction(env ,policy ,50 ,0.9)
+    print("monto",v.reshape((len(map), len(map[0]))))
     print(policy)
 
 
@@ -539,13 +568,15 @@ if __name__ == "__main__":
     # plot_policy_arrows(policy, map)
 
 
-    do_policy(env, policy,50)
+    do_policy(env, policy,5)
 
     rewards = 0
     for t in range(100):
         action = env.action_space.sample()
         next_state, reward, done, truncated, info = env.step(action)
         rewards += reward
+
+
 
         # action = 2
         # next_state, reward, done, truncated, info = env.step(action)
@@ -562,9 +593,14 @@ if __name__ == "__main__":
 
     # V, policy = policy_iteration(env, map, theta=0.0001,discount_factor=0.99)
 
-    # plot_state_value(V, map)
+    # plot_state_value(v, map)
     # plot_policy_arrows(policy, map)
-    # plot_policy_terminal(policy, map)
+    plot_policy_terminal(policy, map)
+    # s = 12
+    # print(env.P[s][0])
+    # print(env.P[s][1])
+    # print(env.P[s][2])
+    # print(env.P[s][3])
     # do_policy(env, policy, episdoes=5)
 
     # num_episodes = 10000
